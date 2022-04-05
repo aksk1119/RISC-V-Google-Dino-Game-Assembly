@@ -71,6 +71,7 @@
     .eqv LAST_ROW 29                    # 31 - last two rows don't show on screen
     .eqv PLAYER_IDLE_ROW 28
     .eqv PLAYER_JUMP_ROW 27
+    .eqv PLAYER_COLUMN 34
     .eqv ADDRESSES_PER_ROW 512
     .eqv NEG_ADDRESSES_PER_ROW -512
     .eqv STARTING_LOC 0x8204
@@ -96,8 +97,8 @@ main:
     li s0, 0x8000
 
     # Set the color from the switches
-    #jal ra, SET_COLOR_FROM_SWITCHES
-    jal ra, SET_COLOR_FROM_STARTING_LOC
+    # jal ra, SET_COLOR_FROM_SWITCHES
+    # jal ra, SET_COLOR_FROM_STARTING_LOC
 
 RESTART:
 
@@ -106,9 +107,9 @@ RESTART:
     sw x0, TIMER(tp)
 
     # Write ending character at given location
-    # lw t0, %lo(ENDING_CHARACTER)(gp)                   # Load character value to write
-    # lw t1, %lo(ENDING_CHARACTER_LOC)(gp)               # Load address of character location
-    # sw t0, 0(t1)
+    lw t0, %lo(ENDING_CHARACTER)(gp)                   # Load character value to write
+    lw t1, %lo(PLAYER_STARTING_LOC)(gp)               # Load address of character location
+    sw t0, 0(t1)
 
     # Write moving character at starting location
     li a0, STARTING_LOC
@@ -147,8 +148,7 @@ UPDATE_GRAPHIC:
     li t1, 1
     beq t1, t0, UT_DONE
     // Update the Graphic
-
-    lw 
+    
 
     addi t1, t1, 1
     beq x0, x0, UPDATE_GRAPHIC
@@ -201,13 +201,11 @@ PB_CHECK_BTNU:
     
     j PB_DONE_BTN_CHECK
 
-
 PB_CHECK_BTNC:
     addi t1, x0, BUTTON_C_MASK
     # This branch will only be taken if multiple buttons are pressed
     bne t0, t1, PB_DONE_BTN_CHECK
     # Code for BTNC
-
 
 PB_DONE_BTN_CHECK:
     # See if the new location is the end location
@@ -229,28 +227,11 @@ PB_EXIT:
     jalr x0, ra, 0
 
 
-################################################################################
-#
-################################################################################
-REACH_END:
-    # Display the end character
-    li t0, CHAR_Z_MAGENTA
-    lw t1, %lo(ENDING_CHARACTER_LOC)(gp)               # Load address of end location
-    sw t0, 0(t1)
+########################################
+# 
+########################################
 
-    # Wait for no button (so last button doesn't count)
-RE_1:
-    lw t0, BUTTON_OFFSET(tp)
-    # Keep jumping back while a button is being pressed
-    bne x0, t0, RE_1
-    # A button not being pressed
-    # Now wait until a button is pressed
-RE_2:
-    lw t0, BUTTON_OFFSET(tp)
-    # Keep jumping back until a button is pressed
-    beq x0, t0, RE_2
 
-    jalr x0, ra, 0
 
 
 
@@ -264,7 +245,7 @@ PLAYER_STARTING_LOC:
     .word STARTING_LOC
 
 # This stores the value of the character that will move around
-MOVING_CHARACTER:
+PLAYER_CHARACTER:
     .word CHAR_PLAYER_IDLE
 
 # The location where bats are spawned.
