@@ -61,7 +61,7 @@
     .eqv CHAR_BAT_A 0x77700062
     .eqv CHAR_SLIME 0x02
     .eqv CHAR_SLIME_A 0x77700002
-    .eqv CHAR_SPACE 0x20
+    .eqv CHAR_SPACE 0x20 
     
     .eqv COLUMN_MASK 0x1fc
     .eqv COLUMN_SHIFT 2
@@ -83,6 +83,10 @@
     .eqv MC_RESTORE_OLD_CHARACTER 0x2
     .eqv MC_RESTORE_OLD_WRITE_NEW_CHARACTER 0x3
 
+    # Values of Obstacles
+    .eqv SLIME_VALUE 1
+    .eqv BAT_VALUE 2
+
 
 main:
 	# Setup the stack: sp = 0x3ffc
@@ -95,6 +99,9 @@ main:
     li tp, 0x7f00
     # Prepare VGA base address
     li s0, 0x8000
+
+    ## Array of obstacles to be generated
+    
 
     # Set the color from the switches
     # jal ra, SET_COLOR_FROM_SWITCHES
@@ -235,6 +242,32 @@ PB_EXIT:
 
 
 
+
+
+
+
+########################################
+# Obstacles 
+########################################
+
+
+## Designate a register to be the pointer of the obstacle array
+## Create a pointer for the obstacle position array
+## Create an array that will hold all of the column position values of the obstacles
+## When a value in the obstacle position array reaches 0, change the index of all the values in the array, shifting them forward to the beginning.
+## In other words, delete and shift to save space.
+UPDATE_OBSTACLE_POSITION:
+
+DRAW_OBSTACLE:
+
+ERASE_OBSTACLE:
+
+CHECK_COLLISION:
+
+
+
+
+
 ########################################
 # Data segment
 ########################################
@@ -263,4 +296,9 @@ SLIME_CHAR:
 # The Character for bat.
 BAT_CHAR:
     .word CHAR_BAT
+
+OBSTACLE_ARRAY:
+## use a stack pointer to save a register, and then use said register to incremement an index to add to the array.
+## currently holds 10 slimes
+.word 1 1 1 1 1 1 1 1 1 1
 ######################################################################################
