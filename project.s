@@ -69,12 +69,10 @@
     .eqv ROW_SHIFT 9
     .eqv LAST_COLUMN 76                 # 79 - last two columns don't show on screen
     .eqv LAST_ROW 29                    # 31 - last two rows don't show on screen
-    .eqv PLAYER_IDLE_ROW 28
-    .eqv PLAYER_JUMP_ROW 27
-    .eqv PLAYER_COLUMN 34
+
     .eqv ADDRESSES_PER_ROW 512
     .eqv NEG_ADDRESSES_PER_ROW -512
-    .eqv STARTING_LOC 0x8204
+    .eqv STARTING_LOC 0xb650
     .eqv ENDING_LOC 0xb700              # 64, 27 or 0x8000+64*4+27*512=0xb700
     .eqv SEGMENT_TIMER_INTERVAL 100
 
@@ -83,10 +81,25 @@
     .eqv MC_RESTORE_OLD_CHARACTER 0x2
     .eqv MC_RESTORE_OLD_WRITE_NEW_CHARACTER 0x3
 
+    # Dinosaur Constants
+    .eqv DINASAUR_RUN1_L 0x000fff03
+    .eqv DINASAUR_RUN1_R 0x000fff04
+    .eqv DINASAUR_RUN2_L 0x000fff05
+    .eqv DINASAUR_RUN2_R 0x000fff06
+    .eqv DINASAUR_DUCT1_L 0x000fff07
+    .eqv DINASAUR_DUCT1_R 0x000fff08
+    .eqv DINASAUR_DUCT2_L 0x000fff09
+    .eqv DINASAUR_DUCT2_R 0x000fff0a
+    .eqv DINASAUR_JUMP_L 0x000fff0b
+    .eqv DINASAUR_JUMP_R 0x000fff0c
+
+    .eqv DINOSAUR_IDLE_ROW 28
+    .eqv DINOSAUR_JUMP_ROW 27
+    .eqv DINOSAUR_COLUMN 34
+
     # Values of Obstacles
     .eqv SLIME_VALUE 1
     .eqv BAT_VALUE 2
-
 
 main:
 	# Setup the stack: sp = 0x3ffc
@@ -114,14 +127,14 @@ RESTART:
     sw x0, TIMER(tp)
 
     # Write ending character at given location
-    lw t0, %lo(ENDING_CHARACTER)(gp)                   # Load character value to write
-    lw t1, %lo(PLAYER_STARTING_LOC)(gp)               # Load address of character location
-    sw t0, 0(t1)
+    # lw t0, %lo(ENDING_CHARACTER)(gp)                   # Load character value to write
+    # lw t1, %lo(PLAYER_STARTING_LOC)(gp)               # Load address of character location
+    # sw t0, 0(t1)
 
     # Write moving character at starting location
-    li a0, STARTING_LOC
-    li a1, MC_WRITE_NEW_CHARACTER
-    jal MOVE_CHARACTER
+    # li a0, STARTING_LOC
+    # li a1, MC_WRITE_NEW_CHARACTER
+    # jal MOVE_CHARACTER
 
 PROC_BUTTONS:
 
@@ -132,7 +145,7 @@ PROC_BUTTONS:
     beq x0, a0, PROC_BUTTONS
 
     # If return is non-zero, restart
-    jal REACH_END
+    # jal REACH_END
     j RESTART
 
 
@@ -154,7 +167,7 @@ UPDATE_GRAPHIC:
     li t0, LAST_COLUMN
     li t1, 1
     beq t1, t0, UT_DONE
-    // Update the Graphic
+    # Update the Graphic
     
 
     addi t1, t1, 1
@@ -199,28 +212,15 @@ PB_CHECK_BTND:
     bne t0, t1, PB_CHECK_BTNU
     # Code for BTND - Move pointer down
     
-    j PB_DONE_BTN_CHECK
+    j PB_EXIT_NOT_AT_END
 
 PB_CHECK_BTNU:
     addi t1, x0, BUTTON_U_MASK
-    bne t0, t1, PB_CHECK_BTNC
+    bne t0, t1, PB_EXIT_NOT_AT_END
     # Code for BTNU - Move pointer up
+    jal DINASAUR_JUMP
     
-    j PB_DONE_BTN_CHECK
-
-PB_CHECK_BTNC:
-    addi t1, x0, BUTTON_C_MASK
-    # This branch will only be taken if multiple buttons are pressed
-    bne t0, t1, PB_DONE_BTN_CHECK
-    # Code for BTNC
-
-PB_DONE_BTN_CHECK:
-    # See if the new location is the end location
-    lw t1, %lo(ENDING_CHARACTER_LOC)(gp)               # Load address of end location
-    bne t1, a0, PB_EXIT_NOT_AT_END
-    # Reached the end - return a 1
-    addi a0, x0, 1
-    beq x0, x0, PB_EXIT
+    j PB_EXIT_NOT_AT_END
 
 PB_EXIT_NOT_AT_END:
     # return 0 - not reached end
@@ -234,17 +234,29 @@ PB_EXIT:
     jalr x0, ra, 0
 
 
+################################################################################
+# The Dinasaur movement
+################################################################################
+
 ########################################
-# 
+# Jump
 ########################################
+DINASAUR_JUMP:
+    # Draw Jump Left
+    lw t0, %lo(DINOSAUR_LOC)(gp)
+    li t1, DINASAUR_JUMP_L
+    
+    # Save the value of the displaced character
+    sw t1, NEG_ADDRESSES_PER_ROW(t0)
+    # Draw Jump Right
+    lw t0, %lo(DINOSAUR_LOC)(gp)
+    # One next column
+    addi t0, t0, 4
+    li t1, DINASAUR_JUMP_R
+    # Save the value of the displaced character
+    sw t1, NEG_ADDRESSES_PER_ROW(t0)
 
-
-
-
-
-
-
-
+    jalr x0, ra, 0
 
 ########################################
 # Obstacles 
@@ -274,7 +286,7 @@ CHECK_COLLISION:
 
 .data
 # This stores the value of the character that represents the destination
-PLAYER_STARTING_LOC:
+DINOSAUR_LOC:
     .word STARTING_LOC
 
 # This stores the value of the character that will move around
