@@ -72,7 +72,7 @@
 
     .eqv ADDRESSES_PER_ROW 512
     .eqv NEG_ADDRESSES_PER_ROW -512
-    .eqv STARTING_LOC 0xb650
+    .eqv STARTING_LOC 0xb850
     .eqv ENDING_LOC 0xb700              # 64, 27 or 0x8000+64*4+27*512=0xb700
     .eqv SEGMENT_TIMER_INTERVAL 100
 
@@ -93,8 +93,8 @@
     .eqv DINASAUR_JUMP_L 0x000fff0b
     .eqv DINASAUR_JUMP_R 0x000fff0c
 
-    .eqv DINOSAUR_IDLE_ROW 28
-    .eqv DINOSAUR_JUMP_ROW 27
+    .eqv DINOSAUR_IDLE_ROW 0x3600
+    .eqv DINOSAUR_JUMP_ROW 0x3800
     .eqv DINOSAUR_COLUMN 34
 
     # Values of Obstacles
@@ -242,10 +242,16 @@ PB_EXIT:
 # Jump
 ########################################
 DINASAUR_JUMP:
+    # If the current status is not jump,
     # Draw Jump Left
+    li t1, STARTING_LOC
+    li t2, ROW_MASK
+    and t0, t1, t2
+    li t1, DINOSAUR_JUMP_ROW
+    beq t0, t1, DINOSAUR_JUMP_DONE
+
     lw t0, %lo(DINOSAUR_LOC)(gp)
     li t1, DINASAUR_JUMP_L
-    
     # Save the value of the displaced character
     sw t1, NEG_ADDRESSES_PER_ROW(t0)
     # Draw Jump Right
@@ -256,11 +262,14 @@ DINASAUR_JUMP:
     # Save the value of the displaced character
     sw t1, NEG_ADDRESSES_PER_ROW(t0)
 
+DINOSAUR_JUMP_DONE:
     jalr x0, ra, 0
 
-########################################
+
+
+################################################################################
 # Obstacles 
-########################################
+################################################################################
 
 
 ## Designate a register to be the pointer of the obstacle array
