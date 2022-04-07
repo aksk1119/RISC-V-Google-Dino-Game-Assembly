@@ -37,3 +37,11 @@ java -jar ../resources/rars1_4.jar mc CompactTextAtZero a \
   dump .data HexText final_iosystem_data.mem \
   dump .text SegmentWindow final_iosystem_s.txt \
   final_iosystem.s
+
+vivado -mode batch -source ../resources/load_mem.tcl -tclargs updateMem final_io.dcp final_iosystem_text.mem final_iosystem_data.mem final_io.bit final_io.dcp
+
+vivado -mode batch -source ../resources/load_mem.tcl -tclargs updateFont final_io.dcp project_font.txt font.bit font.dcp
+
+vivado -mode batch -source ../resources/load_mem.tcl -tclargs updateBackground font.dcp background_mem.txt back.bit back.dcp
+
+
