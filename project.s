@@ -55,13 +55,12 @@
     .eqv BUTTON_R_MASK 0x08
     .eqv BUTTON_U_MASK 0x10
 
-    .eqv CHAR_PLAYER_IDLE 0x61
-    .eqv CHAR_PLAYER_IDLE_A 0x77700061
     .eqv CHAR_BAT 0x62
     .eqv CHAR_BAT_A 0x77700062
     .eqv CHAR_SLIME 0x02
     .eqv CHAR_SLIME_A 0x77700002
     .eqv CHAR_SPACE 0x20 
+    .eqv CHAR_MASK 0x0000007f
     
     .eqv COLUMN_MASK 0x1fc
     .eqv COLUMN_SHIFT 2
@@ -74,39 +73,41 @@
     .eqv NEG_ADDRESSES_PER_ROW -512
     .eqv STARTING_LOC 0xb850
     .eqv ENDING_LOC 0xb700              # 64, 27 or 0x8000+64*4+27*512=0xb700
-    .eqv SEGMENT_TIMER_INTERVAL 200
+    .eqv SEGMENT_TIMER_INTERVAL 100
 
-    # Parameters for the MOVE_CHARACTER subroutine
-    .eqv MC_WRITE_NEW_CHARACTER 0x1
-    .eqv MC_RESTORE_OLD_CHARACTER 0x2
-    .eqv MC_RESTORE_OLD_WRITE_NEW_CHARACTER 0x3
+    # Graphic basics
+    .eqv EMPTY_SPACE 0x00000f00
 
     # Dinosaur Constants
-    .eqv DINOSAUR_RUN1_L 0x000fff03
-    .eqv DINOSAUR_RUN1_R 0x000fff04
-    .eqv DINOSAUR_RUN2_L 0x000fff05
-    .eqv DINOSAUR_RUN2_R 0x000fff06
+    .eqv DINOSAUR_RUN1_L  0x000fff03
+    .eqv DINOSAUR_RUN1_R  0x000fff04
+    .eqv DINOSAUR_RUN2_L  0x000fff05
+    .eqv DINOSAUR_RUN2_R  0x000fff06
     .eqv DINOSAUR_DUCK1_L 0x000fff07
     .eqv DINOSAUR_DUCK1_R 0x000fff08
     .eqv DINOSAUR_DUCK2_L 0x000fff09
     .eqv DINOSAUR_DUCK2_R 0x000fff0a
-    .eqv DINOSAUR_JUMP_L 0x000fff0b
-    .eqv DINOSAUR_JUMP_R 0x000fff0c
+    .eqv DINOSAUR_JUMP_L  0x000fff0b
+    .eqv DINOSAUR_JUMP_R  0x000fff0c
 
-    .eqv DINOSAUR_IDLE_ST 0x00000000
+    .eqv DINOSAUR_RUN_ST  0x00000000
     .eqv DINOSAUR_JUMP_ST 0x00000001
     .eqv DINOSAUR_DUCK_ST 0x00000002
 
     .eqv RUN_1_ST 0x00000001
     .eqv RUN_2_ST 0x00000002
 
-    .eqv DINOSAUR_IDLE_ROW 27
+    .eqv DINOSAUR_RUN_ROW  27
     .eqv DINOSAUR_JUMP_ROW 26
-    .eqv DINOSAUR_COLUMN 34
+    .eqv DINOSAUR_COLUMN   34
+
+    .eqv JUMP_AIR_TICKS     3
+    .eqv JUMP_FALLING_TICKS 4
+    .eqv JUMP_GROUND_TICKS  6
 
     # Values of Obstacles
     .eqv SLIME_VALUE 1
-    .eqv BAT_VALUE 2
+    .eqv BAT_VALUE   2
 
 main:
 	# Setup the stack: sp = 0x3ffc
@@ -133,16 +134,6 @@ RESTART:
     sw x0, SEVENSEG_OFFSET(tp)
     sw x0, TIMER(tp)
 
-    # Write ending character at given location
-    # lw t0, %lo(ENDING_CHARACTER)(gp)                   # Load character value to write
-    # lw t1, %lo(PLAYER_STARTING_LOC)(gp)               # Load address of character location
-    # sw t0, 0(t1)
-
-    # Write moving character at starting location
-    # li a0, STARTING_LOC
-    # li a1, MC_WRITE_NEW_CHARACTER
-    # jal MOVE_CHARACTER
-
 PROC_BUTTONS:
 
     # Wait for a button press
@@ -167,8 +158,26 @@ UPDATE_TIMER:
     # timer has reached tick, incremenet seven segmeent display and clear timer
     sw x0, TIMER(tp)
     lw t0, SEVENSEG_OFFSET(tp)
-    addi t0, t0, 1
+    addi t0, t0, 2
     sw t0, SEVENSEG_OFFSET(tp)
+
+LED_FOR_STATUS:
+    lw t3, %lo(DINOSAUR_STATUS)(gp)
+    li t0, DINOSAUR_JUMP_ST
+    beq t3, t0, STATUS_JUMP_LED
+    li t0, DINOSAUR_DUCK_ST
+    beq t3, t0, STATUS_DUCK_LED
+STATUS_RUN_LED:
+    li t0, 0x0001
+    sw t0, LED_OFFSET(tp)
+    j UPDATE_GRAPHIC
+STATUS_JUMP_LED:
+    li t0, 0x0002
+    sw t0, LED_OFFSET(tp)
+    j UPDATE_GRAPHIC
+STATUS_DUCK_LED:
+    li t0, 0x0004
+    sw t0, LED_OFFSET(tp)
 
 UPDATE_GRAPHIC:
     # Update the Graphic
@@ -183,7 +192,7 @@ UT_DONE:
 
 
 ################################################################################
-#
+# Push Buttons
 ################################################################################
 
 PROCESS_BUTTONS:
@@ -207,34 +216,56 @@ PB_2:
     jal UPDATE_TIMER
     lw t0, BUTTON_OFFSET(tp)
     # Keep jumping back until a button is pressed
-    beq x0, t0, PB_2
+    
+    # If any button is pressed, go check which button it is.
+    # Don't change state if dinosaur is already jumping.
+    li t1, DINOSAUR_JUMP_ST
+    beq t3, t1, PB_2
+    
+    # If any button is pressed, go check which button is pressed.
+    bne x0, t0, PB_CHECK_BTNU
 
-    # some button is being pressed.
+    # If not, if current state is duck, set state to Run state.
+    lw t3, %lo(DINOSAUR_STATUS)(gp)
+    li t1, DINOSAUR_DUCK_ST
+    beq t3, t1, PB_CHECK_NO_BUTTON
+
+    j PB_2 # Keep looping through this part until there is a button pressed.
+
 PB_CHECK_BTNU:
     addi t1, x0, BUTTON_U_MASK
     bne t0, t1, PB_CHECK_BTND
     # Code for BTNU
+    
+    # Reset dinosaur jump height.
+    add s1, x0, x0
+    # Updating dinosaur status to Jump.
     li t0, DINOSAUR_JUMP_ST
     addi t2, gp, %lo(DINOSAUR_STATUS)
-    sw t0, 0(t2)     # Updating dinosaur status to Jump.
-    
-    j PB_CHECK_BTND_DONE
+    sw t0, 0(t2)
 
+    j PB_CHECK_BTN_DONE
+
+# some button is being pressed.
 PB_CHECK_BTND:
     addi t1, x0, BUTTON_D_MASK
-    bne t0, t1, PB_CHECK_BTND_DONE
+    bne t0, t1, PB_CHECK_NO_BUTTON
     # Code for BTND
-    lw t0, %lo(DINOSAUR_STATUS)(gp)
-    li t1, DINOSAUR_JUMP_ST
-    beq t0, t1, PB_CHECK_BTND_DONE
+    # Updating dinosaur status to Duck.
     li t0, DINOSAUR_DUCK_ST
     addi t2, gp, %lo(DINOSAUR_STATUS)
-    sw t0, 0(t2)     # Updating dinosaur status to Duck.
+    sw t0, 0(t2)
 
-PB_CHECK_BTND_DONE:
-    mv a0, x0
+    j PB_CHECK_BTN_DONE
 
-PB_EXIT:
+PB_CHECK_NO_BUTTON:
+    # Updating dinosaur status to RUN.
+
+    li t0, DINOSAUR_RUN_ST
+    addi t2, gp, %lo(DINOSAUR_STATUS)
+    sw t0, 0(t2)
+
+PB_CHECK_BTN_DONE:
     # Restore stack
 	lw ra, 0(sp)		# Restore return address
 	addi sp, sp, 4		# Update stack pointer
@@ -243,12 +274,8 @@ PB_EXIT:
 
 
 ################################################################################
-# The Dinasaur movement
+# The Dinasaur movement state machine
 ################################################################################
-
-########################################
-# Jump
-########################################
 DINOSAUR_CONTROL:
     # This chooses state based off status.
     lw t0, %lo(DINOSAUR_STATUS)(gp)
@@ -256,6 +283,10 @@ DINOSAUR_CONTROL:
     beq t0, t1, DINOSAUR_JUMP
     li t1, DINOSAUR_DUCK_ST
     beq t0, t1, DINOSAUR_DUCK
+
+########################################
+# Run State
+########################################
 DINOSAUR_RUN:
     lw t0, %lo(DINOSAUR_RUN_STATUS)(gp)
     li t1, RUN_1_ST
@@ -277,10 +308,7 @@ DRAW_RUN1:
     addi t1, t1, 4
     sw t0, 0(t1)
 
-    li t0, 0x1111
-    sw t0, LED_OFFSET(tp)
-
-    beq x0, x0, DINOSAUR_JUMP_DONE
+    beq x0, x0, DINOSAUR_CONTROL_DONE
 
 DRAW_RUN2:
     li t0, RUN_2_ST
@@ -298,37 +326,111 @@ DRAW_RUN2:
     addi t1, t1, 4
     sw t0, 0(t1)
 
-    li t0, 0x2222
-    sw t0, LED_OFFSET(tp)
+    beq x0, x0, DINOSAUR_CONTROL_DONE
 
-    beq x0, x0, DINOSAUR_JUMP_DONE
-
+########################################
+# Jump State
+########################################
 DINOSAUR_JUMP:
+    addi s1, s1, 1
+    # If over 6 ticks passed, go to run state.
+    addi t0, x0, JUMP_GROUND_TICKS
+    blt s1, t0, JUMP_STATUS_CHECK
+    li t0, DINOSAUR_RUN_ST
+    addi t2, gp, %lo(DINOSAUR_STATUS)
+    sw t0, 0(t2)
+    j DINOSAUR_RUN
 
-    beq x0, x0, DINOSAUR_JUMP_DONE
+JUMP_STATUS_CHECK:
+    # If over 4 ticks passed, get down.
+    li t0, JUMP_FALLING_TICKS
+    bge s1, t0, JUMP_POS_DOWN
+    # If over 2 ticks passed, stay up.
+    li t0, JUMP_AIR_TICKS
+    bge s1, t0, DRAW_JUMP
+
+JUMP_POS_UP:
+    lw s2, %lo(DINOSAUR_LOC)(gp)
+    addi t1, s2, NEG_ADDRESSES_PER_ROW
+    addi t2, gp, %lo(DINOSAUR_LOC)
+    sw t1, 0(t2)
+    j DRAW_JUMP
+
+JUMP_POS_DOWN:
+    lw s2, %lo(DINOSAUR_LOC)(gp)
+    addi t1, s2, ADDRESSES_PER_ROW
+    addi t2, gp, %lo(DINOSAUR_LOC)
+    sw t1, 0(t2)
+
 DRAW_JUMP:
-    # li t0, STARTING_LOC
-    # addi t0, t0, NEG_ADDRESSES_PER_ROW
-    # addi t0, t0, NEG_ADDRESSES_PER_ROW
-    # li t0, DINOSAUR_JUMP_L
-    # addi t1, gp, 4
-    # sw t0, STARTING_LOC(t1)
-    # li t0, DINOSAUR_JUMP_L
-    # addi t1, gp, 4
-    # sw t0, STARTING_LOC(t1)
-    beq x0, x0, DINOSAUR_JUMP_DONE
+    # Draw an empty char to the prev position.
+    lw t0, %lo(EMPTY_TILE)(gp)              # Load character value to write
+    sw t0, 0(s2)                        # Draw Left side
+    addi t1, s2, 4                      
+    sw t0, 0(t1)                        # Draw Right side
+
+    # Draw Left side
+    lw t0, %lo(JUMP_L)(gp)                   # Load character value to write
+    lw t1, %lo(DINOSAUR_LOC)(gp)             # Load address of character location
+    sw t0, 0(t1)
+
+    # Draw Right side
+    lw t0, %lo(JUMP_R)(gp)                   # Load character value to write
+    lw t1, %lo(DINOSAUR_LOC)(gp)             # Load address of character location
+    addi t1, t1, 4
+    sw t0, 0(t1)
+
+    beq x0, x0, DINOSAUR_CONTROL_DONE
+
+########################################
+# Duck State
+########################################
 DINOSAUR_DUCK:
+    lw t0, %lo(DINOSAUR_RUN_STATUS)(gp)
+    li t1, RUN_1_ST
+    beq t0, t1, DRAW_DUCK2
 
-DINOSAUR_JUMP_DONE:
+DRAW_DUCK1:
+    li t0, RUN_1_ST
+    addi t2, gp, %lo(DINOSAUR_RUN_STATUS)
+    sw t0, 0(t2)
+
+    # Draw Left side
+    lw t0, %lo(DUCK1_L)(gp)                  # Load character value to write
+    lw t1, %lo(DINOSAUR_LOC)(gp)             # Load address of character location
+    sw t0, 0(t1)
+
+    # Draw Right side
+    lw t0, %lo(DUCK1_R)(gp)                  # Load character value to write
+    lw t1, %lo(DINOSAUR_LOC)(gp)             # Load address of character location
+    addi t1, t1, 4
+    sw t0, 0(t1)
+
+    beq x0, x0, DINOSAUR_CONTROL_DONE
+
+DRAW_DUCK2:
+    li t0, RUN_2_ST
+    addi t2, gp, %lo(DINOSAUR_RUN_STATUS)
+    sw t0, 0(t2)
+
+    # Draw Left side
+    lw t0, %lo(DUCK2_L)(gp)                  # Load character value to write
+    lw t1, %lo(DINOSAUR_LOC)(gp)             # Load address of character location
+    sw t0, 0(t1)
+
+    # Draw Right side
+    lw t0, %lo(DUCK2_R)(gp)                  # Load character value to write
+    lw t1, %lo(DINOSAUR_LOC)(gp)             # Load address of character location
+    addi t1, t1, 4
+    sw t0, 0(t1)
+
+DINOSAUR_CONTROL_DONE:
     jalr x0, ra, 0
-
 
 
 ################################################################################
 # Obstacles 
 ################################################################################
-
-
 ## Designate a register to be the pointer of the obstacle array
 ## Create a pointer for the obstacle position array
 ## Create an array that will hold all of the column position values of the obstacles
@@ -340,11 +442,18 @@ DRAW_OBSTACLE:
 
 ERASE_OBSTACLE:
 
-CHECK_COLLISION:
+COLLISION_CHECK:
+    addi t0, gp, %lo(DINOSAUR_LOC)
+    addi t0, t0, 8
+    lw t1, 0(t0)
+    andi t1, t1, CHAR_MASK
+    li t0, CHAR_SPACE
+    bne t0, t1, GAMEOVER
 
+COLLISION_CHECK_DONE:
+    jalr x0, ra, 0
 
-
-
+GAMEOVER:
 
 ########################################
 # Data segment
@@ -356,14 +465,10 @@ DINOSAUR_LOC:
     .word STARTING_LOC
 
 DINOSAUR_STATUS:
-    .word DINOSAUR_IDLE_ST
+    .word DINOSAUR_RUN_ST
 
 DINOSAUR_RUN_STATUS:
     .word RUN_1_ST
-
-# This stores the value of the character that will move around
-PLAYER_CHARACTER:
-    .word CHAR_PLAYER_IDLE
 
 RUN1_L:
     .word DINOSAUR_RUN1_L
@@ -373,7 +478,20 @@ RUN2_L:
     .word DINOSAUR_RUN2_L
 RUN2_R:
     .word DINOSAUR_RUN2_R
-
+JUMP_L:
+    .word DINOSAUR_JUMP_L
+JUMP_R:
+    .word DINOSAUR_JUMP_R
+DUCK1_L:
+    .word DINOSAUR_DUCK1_L
+DUCK1_R:
+    .word DINOSAUR_DUCK1_R
+DUCK2_L:
+    .word DINOSAUR_DUCK2_L
+DUCK2_R:
+    .word DINOSAUR_DUCK2_R
+EMPTY_TILE:
+    .word EMPTY_SPACE
 # The location where bats are spawned.
 BAT_SPAWN_LOC:
     .word 
@@ -390,7 +508,7 @@ SLIME_CHAR:
 BAT_CHAR:
     .word CHAR_BAT
 
-OBSTACLE_ARRAY:
+OBSTACLE_POS_ARRAY:
 ## use a stack pointer to save a register, and then use said register to incremement an index to add to the array.
 ## currently holds 10 slimes
 .word 1 1 1 1 1 1 1 1 1 1
