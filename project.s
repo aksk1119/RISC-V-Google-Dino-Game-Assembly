@@ -55,12 +55,6 @@
     .eqv BUTTON_R_MASK 0x08
     .eqv BUTTON_U_MASK 0x10
 
-    .eqv CHAR_BAT 0x62
-    .eqv CHAR_BAT_A 0x77700062
-    .eqv CHAR_SLIME 0x02
-    .eqv CHAR_SLIME_A 0x77700002
-    .eqv CHAR_SPACE 0x20 
-    .eqv CHAR_MASK 0x0000007f
     
     .eqv COLUMN_MASK 0x1fc
     .eqv COLUMN_SHIFT 2
@@ -72,10 +66,11 @@
     .eqv ADDRESSES_PER_ROW 512
     .eqv NEG_ADDRESSES_PER_ROW -512
     .eqv STARTING_LOC 0xb850
-    .eqv ENDING_LOC 0xb700              # 64, 27 or 0x8000+64*4+27*512=0xb700
     .eqv SEGMENT_TIMER_INTERVAL 100
 
     # Graphic basics
+    .eqv CHAR_SPACE 0x20 
+    .eqv CHAR_MASK 0x0000007f
     .eqv EMPTY_SPACE 0x00000f00
 
     # Dinosaur Constants
@@ -105,9 +100,11 @@
     .eqv JUMP_FALLING_TICKS 4
     .eqv JUMP_GROUND_TICKS  6
 
-    # Values of Obstacles
-    .eqv SLIME_VALUE 1
-    .eqv BAT_VALUE   2
+    # Obstacles
+    .eqv SLIME_SPAWN  0xb850 // TODO Fix the address.
+    .eqv BAT_SPAWN  0xb850   // TODO Fix the address.
+    .eqv CHAR_BAT   0x000fff02 // TODO Draw new character.
+    .eqv CHAR_SLIME 0x000fff01 // TODO Draw new character.
 
 main:
 	# Setup the stack: sp = 0x3ffc
@@ -436,12 +433,50 @@ DINOSAUR_CONTROL_DONE:
 ## Create an array that will hold all of the column position values of the obstacles
 ## When a value in the obstacle position array reaches 0, change the index of all the values in the array, shifting them forward to the beginning.
 ## In other words, delete and shift to save space.
+
+############################
+# Update Obstacle Position
+#
+# This will update obstacle positions 
+# and move the sprite to the next tile.
+#
+############################
 UPDATE_OBSTACLE_POSITION:
 
+OBSTACLE_POSITION_LOOP:
+
+    bne t0, x0, OBSTACLE_POSITION_LOOP
+
+############################
+# Draw Obstacle
+#
+# a0: type of obstacle
+#  -> 0: Slime
+#  -> 1: Bat
+#
+############################
 DRAW_OBSTACLE:
 
+DRAW_SLIME:
+    lw t0, %lo(SLIME_SPRITE)(gp)                # Load character value to write
+    lw t1, %lo(SLIME_SPAWN_LOC)(gp)             # Load address of character location
+    sw t0, 0(t1)
+DRAW_BAT:
+    lw t0, %lo(BAT_SPRITE)(gp)                # Load character value to write
+    lw t1, %lo(BAT_SPAWN_LOC)(gp)             # Load address of character location
+    sw t0, 0(t1)
+
+############################
+# Draw Obstacle
+#
+# a0: Index of the obstacle in the array.
+#
+############################
 ERASE_OBSTACLE:
 
+############################
+# Collision check
+############################
 COLLISION_CHECK:
     addi t0, gp, %lo(DINOSAUR_LOC)
     addi t0, t0, 8
@@ -453,23 +488,32 @@ COLLISION_CHECK:
 COLLISION_CHECK_DONE:
     jalr x0, ra, 0
 
+############################
+# Game Over
+############################
 GAMEOVER:
 
-########################################
+
+
+
+################################################################################
 # Data segment
-########################################
+################################################################################
 
 .data
 # This stores the value of the character that represents the destination
 DINOSAUR_LOC:
     .word STARTING_LOC
 
+# Dinosaur status
 DINOSAUR_STATUS:
     .word DINOSAUR_RUN_ST
 
+# Dinosaur run status (to make animation)
 DINOSAUR_RUN_STATUS:
     .word RUN_1_ST
 
+# Holders for the sprite.
 RUN1_L:
     .word DINOSAUR_RUN1_L
 RUN1_R:
@@ -492,24 +536,25 @@ DUCK2_R:
     .word DINOSAUR_DUCK2_R
 EMPTY_TILE:
     .word EMPTY_SPACE
+
 # The location where bats are spawned.
 BAT_SPAWN_LOC:
-    .word 
+    .word BAT_SPAWN
 
 # The location where slimes are spawned.
 SLIME_SPAWN_LOC:
-    .word
+    .word SLIME_SPAWN
 
 # The Character for slime.
-SLIME_CHAR:
+SLIME_SPRITE:
     .word CHAR_SLIME
 
 # The Character for bat.
-BAT_CHAR:
+BAT_SPRITE:
     .word CHAR_BAT
 
+# Use this array to hold the obstacle position.
+# This currently holds 10 obstacles.
 OBSTACLE_POS_ARRAY:
-## use a stack pointer to save a register, and then use said register to incremement an index to add to the array.
-## currently holds 10 slimes
-.word 1 1 1 1 1 1 1 1 1 1
+    .word 1 1 1 1 1 1 1 1 1 1 1
 ######################################################################################
