@@ -441,6 +441,19 @@ DINOSAUR_CONTROL_DONE:
 # and move the sprite to the next tile.
 #
 ############################
+
+
+## Erase obstacle, update pointer, draw obstacle
+
+
+
+###################################
+# Erase Obstacle
+# This will erase the old obstacle
+#
+###################################
+ERASE_OBSTACLE:
+
 UPDATE_OBSTACLE_POSITION:
 
 OBSTACLE_POSITION_LOOP:
@@ -472,7 +485,7 @@ DRAW_BAT:
 # a0: Index of the obstacle in the array.
 #
 ############################
-ERASE_OBSTACLE:
+
 
 ############################
 # Collision check
@@ -555,6 +568,9 @@ BAT_SPRITE:
 
 # Use this array to hold the obstacle position.
 # This currently holds 10 obstacles.
-OBSTACLE_POS_ARRAY:
+OBSTACLE_TYPE_ARRAY:
     .word 1 1 1 1 1 1 1 1 1 1 1
+
+OBSTACLE_POS_ARRAY:
+    .word 0 0 0 0 0 0 0 0 0 0 0
 ######################################################################################
