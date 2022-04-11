@@ -569,7 +569,8 @@ BAT_SPRITE:
 # Use this array to hold the obstacle position.
 # This currently holds 10 obstacles.
 OBSTACLE_TYPE_ARRAY:
-    .word 1 1 1 1 1 1 1 1 1 1 1
+    .word 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    .word 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 OBSTACLE_POS_ARRAY:
     .word 0 0 0 0 0 0 0 0 0 0 0
