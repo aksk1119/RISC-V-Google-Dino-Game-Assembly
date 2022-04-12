@@ -160,7 +160,7 @@ UPDATE_TIMER:
     # timer has reached tick, incremenet seven segmeent display and clear timer
     sw x0, TIMER(tp)
     lw t0, SEVENSEG_OFFSET(tp)
-    addi t0, t0, 2
+    addi t0, t0, 1
     sw t0, SEVENSEG_OFFSET(tp)
 
 LED_FOR_STATUS:
@@ -473,8 +473,10 @@ DRAW_ROCK:
     lw t1, %lo(ROCK_SPAWN_LOC)(gp)           # Load address of character location
     add a1, a1, t1
     sw t0, 0(a1)
+
     addi t1, a1, NEG_ADDRESSES_PER_ROW
     sw t0, 0(t1)
+
     addi t1, t1, NEG_ADDRESSES_PER_ROW
     sw t0, 0(t1)
 
