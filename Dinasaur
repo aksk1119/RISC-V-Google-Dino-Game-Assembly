@@ -42,6 +42,6 @@ vivado -mode batch -source ../resources/load_mem.tcl -tclargs updateMem final.dc
 
 vivado -mode batch -source ../resources/load_mem.tcl -tclargs updateFont final.dcp project_font.txt final.bit final.dcp
 
-vivado -mode batch -source ../resources/load_mem.tcl -tclargs updateBackground final.dcp background_mem.txt final.bit final.dcp
+vivado -mode batch -source ../resources/load_mem.tcl -tclargs updateBackground final.dcp project_background.txt final.bit final.dcp
 
 
