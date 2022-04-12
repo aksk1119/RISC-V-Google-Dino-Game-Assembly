@@ -65,7 +65,7 @@
 
     .eqv ADDRESSES_PER_ROW 512
     .eqv NEG_ADDRESSES_PER_ROW -512
-    .eqv STARTING_LOC 0xb850
+    
     .eqv SEGMENT_TIMER_INTERVAL 100
 
     # Graphic basics
@@ -74,6 +74,7 @@
     .eqv EMPTY_SPACE 0x00000f00
 
     # Dinosaur Constants
+    .eqv STARTING_LOC 0xb850
     .eqv DINOSAUR_RUN1_L  0x000fff03
     .eqv DINOSAUR_RUN1_R  0x000fff04
     .eqv DINOSAUR_RUN2_L  0x000fff05
@@ -94,17 +95,19 @@
 
     .eqv DINOSAUR_RUN_ROW  27
     .eqv DINOSAUR_JUMP_ROW 26
-    .eqv DINOSAUR_COLUMN   34
+    .eqv DINOSAUR_COLUMN   21
 
     .eqv JUMP_AIR_TICKS     3
     .eqv JUMP_FALLING_TICKS 4
     .eqv JUMP_GROUND_TICKS  6
 
     # Obstacles
-    .eqv SLIME_SPAWN  0xb850 // TODO Fix the address.
-    .eqv BAT_SPAWN  0xb850   // TODO Fix the address.
-    .eqv CHAR_BAT   0x000fff02 // TODO Draw new character.
-    .eqv CHAR_SLIME 0x000fff01 // TODO Draw new character.
+    .eqv SLIME_VALUE 1
+    .eqv BAT_VALUE 2
+    .eqv SLIME_SPAWN    0xb800 # TODO Fix the address.
+    .eqv BAT_SPAWN      0xb600   # TODO Fix the address.
+    .eqv CHAR_BAT       0x000fff02 # TODO Draw new character.
+    .eqv CHAR_SLIME     0x000fff01 # TODO Draw new character.
 
 main:
 	# Setup the stack: sp = 0x3ffc
@@ -130,6 +133,8 @@ RESTART:
     # Clear timer and seven segment display
     sw x0, SEVENSEG_OFFSET(tp)
     sw x0, TIMER(tp)
+    addi t0, gp, %lo(OBSTACLE_INDEX_POINTER)
+    sw x0, 0(t0)
 
 PROC_BUTTONS:
 
@@ -180,7 +185,9 @@ UPDATE_GRAPHIC:
     # Update the Graphic
     addi sp, sp, -4	    # Make room to save values on the stack
 	sw ra, 0(sp)		# Copy return address to stack
+    jal ra, DRAW_OBSTACLE
     jal ra, DINOSAUR_CONTROL
+
     lw ra, 0(sp)		# Restore return address
 	addi sp, sp, 4		# Update stack pointer
 
@@ -213,7 +220,10 @@ PB_2:
     jal UPDATE_TIMER
     lw t0, BUTTON_OFFSET(tp)
     # Keep jumping back until a button is pressed
-    
+
+    # If not, if current state is duck, set state to Run state.
+    lw t3, %lo(DINOSAUR_STATUS)(gp)
+
     # If any button is pressed, go check which button it is.
     # Don't change state if dinosaur is already jumping.
     li t1, DINOSAUR_JUMP_ST
@@ -221,9 +231,7 @@ PB_2:
     
     # If any button is pressed, go check which button is pressed.
     bne x0, t0, PB_CHECK_BTNU
-
-    # If not, if current state is duck, set state to Run state.
-    lw t3, %lo(DINOSAUR_STATUS)(gp)
+    
     li t1, DINOSAUR_DUCK_ST
     beq t3, t1, PB_CHECK_NO_BUTTON
 
@@ -397,9 +405,8 @@ DRAW_DUCK1:
     lw t1, %lo(DINOSAUR_LOC)(gp)             # Load address of character location
     sw t0, 0(t1)
 
-    # Draw Right side
+    # Draw Right sidet1
     lw t0, %lo(DUCK1_R)(gp)                  # Load character value to write
-    lw t1, %lo(DINOSAUR_LOC)(gp)             # Load address of character location
     addi t1, t1, 4
     sw t0, 0(t1)
 
@@ -417,7 +424,6 @@ DRAW_DUCK2:
 
     # Draw Right side
     lw t0, %lo(DUCK2_R)(gp)                  # Load character value to write
-    lw t1, %lo(DINOSAUR_LOC)(gp)             # Load address of character location
     addi t1, t1, 4
     sw t0, 0(t1)
 
@@ -434,77 +440,98 @@ DINOSAUR_CONTROL_DONE:
 ## When a value in the obstacle position array reaches 0, change the index of all the values in the array, shifting them forward to the beginning.
 ## In other words, delete and shift to save space.
 
-############################
-# Update Obstacle Position
-#
-# This will update obstacle positions 
-# and move the sprite to the next tile.
-#
-############################
-
-
-## Erase obstacle, update pointer, draw obstacle
-
-
-
-###################################
-# Erase Obstacle
-# This will erase the old obstacle
-#
-###################################
-ERASE_OBSTACLE:
-
-UPDATE_OBSTACLE_POSITION:
-
-OBSTACLE_POSITION_LOOP:
-
-    bne t0, x0, OBSTACLE_POSITION_LOOP
-
-############################
-# Draw Obstacle
-#
-# a0: type of obstacle
-#  -> 0: Slime
-#  -> 1: Bat
-#
-############################
 DRAW_OBSTACLE:
+    addi t4, x0, 0 # t4 is a counter register.
+    # t3 -> permanent index pointer.
+    lw t3, %lo(OBSTACLE_INDEX_POINTER)(gp)  # Get Pointer "VALUE"
+    addi t1, gp, %lo(OBSTACLE_INDEX_POINTER) # Get Pointer's address
+    # t0 -> incremented permanent index.
+    addi t0, t3, 4
+    # Store the new value to the perm index.
+    sw t0, 0(t1)
+
+DRAW_OBSTACLE_LOOP:
+    addi t4, t4, 1 # Increment the counter.
+    
+    slli a1, t4, 2 # Multiply the counter by 4 to make column address value.
+    lw t0, %lo(OBSTACLE_TYPE_ARRAY)(t3) # Get the data from obstacle type array.
+    beq t0, x0, DRAW_BLANK
+    li t1, SLIME_VALUE
+    beq t0, t1, DRAW_SLIME
+    li t1, BAT_VALUE
+    beq t0, t1, DRAW_BAT
+    j DRAWING_DONE
 
 DRAW_SLIME:
-    lw t0, %lo(SLIME_SPRITE)(gp)                # Load character value to write
-    lw t1, %lo(SLIME_SPAWN_LOC)(gp)             # Load address of character location
-    sw t0, 0(t1)
+    lw t0, %lo(SLIME_SPRITE)(gp)              # Load character value to write
+    lw t1, %lo(SLIME_SPAWN_LOC)(gp)           # Load address of character location
+    add a1, a1, t1
+    sw t0, 0(a1)
+    li t2, 20
+    beq t4, t2, COLLISION_CHECK_SLIME
+    li t2, DINOSAUR_COLUMN
+    beq t4, t2, COLLISION_CHECK_SLIME
+    j DRAWING_DONE
+
 DRAW_BAT:
     lw t0, %lo(BAT_SPRITE)(gp)                # Load character value to write
     lw t1, %lo(BAT_SPAWN_LOC)(gp)             # Load address of character location
+    add a1, a1, t1
+    sw t0, 0(a1)
+    li t2, 20
+    beq t4, t2, COLLISION_CHECK_BAT
+    li t2, DINOSAUR_COLUMN
+    beq t4, t2, COLLISION_CHECK_BAT
+    j DRAWING_DONE
+    
+DRAW_BLANK:
+    lw t0, %lo(EMPTY_TILE)(gp)                # Load character value to write
+    lw t1, %lo(SLIME_SPAWN_LOC)(gp)           # Load address of character location
+    add a1, a1, t1
+    sw t0, 0(a1)    # Put blank over the location.
+    addi t1, a1, NEG_ADDRESSES_PER_ROW
+    sw t0, 0(t1)
+    addi t1, t1, NEG_ADDRESSES_PER_ROW
     sw t0, 0(t1)
 
-############################
-# Draw Obstacle
-#
-# a0: Index of the obstacle in the array.
-#
-############################
+    j DRAWING_DONE
+
+DRAWING_DONE:
+    addi t3, t3, 4 # Increment index.
+    li t2, LAST_COLUMN
+    bne t4, t2, DRAW_OBSTACLE_LOOP
+    #######
+    jalr x0, ra, 0
 
 
 ############################
 # Collision check
 ############################
-COLLISION_CHECK:
-    addi t0, gp, %lo(DINOSAUR_LOC)
-    addi t0, t0, 8
-    lw t1, 0(t0)
-    andi t1, t1, CHAR_MASK
-    li t0, CHAR_SPACE
-    bne t0, t1, GAMEOVER
-
-COLLISION_CHECK_DONE:
-    jalr x0, ra, 0
+COLLISION_CHECK_SLIME:
+    lw t0, %lo(DINOSAUR_STATUS)(gp)
+    li t1, DINOSAUR_JUMP_ST
+    beq t0, t1, DRAWING_DONE
+    beq x0, x0, GAMEOVER
+    
+COLLISION_CHECK_BAT:
+    lw t0, %lo(DINOSAUR_STATUS)(gp)
+    li t1, DINOSAUR_DUCK_ST
+    beq t0, t1, DRAWING_DONE
+    beq x0, x0, GAMEOVER
 
 ############################
 # Game Over
 ############################
 GAMEOVER:
+    lw ra, 0(sp)		# Restore return address
+	addi sp, sp, 4		# Update stack pointer
+
+GAMEOVER_WAIT_FOR_NEW_KEY:
+    lw t0, BUTTON_OFFSET(tp)
+    addi t1, x0, BUTTON_C_MASK
+    bne t0, t1, GAMEOVER_WAIT_FOR_NEW_KEY
+
+    j RESTART
 
 
 
@@ -515,6 +542,12 @@ GAMEOVER:
 
 .data
 # This stores the value of the character that represents the destination
+NUMBER_OF_COLUMNS:
+    .word LAST_COLUMN
+
+OBSTACLE_INDEX_POINTER:
+    .word 0
+
 DINOSAUR_LOC:
     .word STARTING_LOC
 
@@ -569,9 +602,37 @@ BAT_SPRITE:
 # Use this array to hold the obstacle position.
 # This currently holds 10 obstacles.
 OBSTACLE_TYPE_ARRAY:
-    .word 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-    .word 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-
-OBSTACLE_POS_ARRAY:
-    .word 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 2 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0
+    .word 0 0 0 0 2 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 2 0 0 0 0 0 0 0 1 0 0
+    .word 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0
+    .word 0 0 0 2 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0
+    .word 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0
+    .word 0 0 0 0 1 0 0 0 0 0 0 0 0 2 0
+    .word 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 2 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0
+    .word 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 ######################################################################################
