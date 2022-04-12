@@ -102,12 +102,12 @@
     .eqv JUMP_GROUND_TICKS  6
 
     # Obstacles
-    .eqv SLIME_VALUE 1
+    .eqv ROCK_VALUE 1
     .eqv BAT_VALUE 2
-    .eqv SLIME_SPAWN    0xb800 # TODO Fix the address.
+    .eqv ROCK_SPAWN    0xb800 # TODO Fix the address.
     .eqv BAT_SPAWN      0xb600   # TODO Fix the address.
     .eqv CHAR_BAT       0x000fff02 # TODO Draw new character.
-    .eqv CHAR_SLIME     0x000fff01 # TODO Draw new character.
+    .eqv CHAR_ROCK     0x000fff01 # TODO Draw new character.
 
 main:
 	# Setup the stack: sp = 0x3ffc
@@ -214,7 +214,6 @@ PB_1:
     bne x0, t0, PB_1
 
     # A button not being pressed
-
     # Now wait until a button is pressed
 PB_2:
     jal UPDATE_TIMER
@@ -440,6 +439,9 @@ DINOSAUR_CONTROL_DONE:
 ## When a value in the obstacle position array reaches 0, change the index of all the values in the array, shifting them forward to the beginning.
 ## In other words, delete and shift to save space.
 
+############################
+# Draw Obstacle
+############################
 DRAW_OBSTACLE:
     addi t4, x0, 0 # t4 is a counter register.
     # t3 -> permanent index pointer.
@@ -450,43 +452,69 @@ DRAW_OBSTACLE:
     # Store the new value to the perm index.
     sw t0, 0(t1)
 
+#### Start of Loop ####
 DRAW_OBSTACLE_LOOP:
     addi t4, t4, 1 # Increment the counter.
     
     slli a1, t4, 2 # Multiply the counter by 4 to make column address value.
     lw t0, %lo(OBSTACLE_TYPE_ARRAY)(t3) # Get the data from obstacle type array.
     beq t0, x0, DRAW_BLANK
-    li t1, SLIME_VALUE
-    beq t0, t1, DRAW_SLIME
+    li t1, ROCK_VALUE
+    beq t0, t1, DRAW_ROCK
     li t1, BAT_VALUE
     beq t0, t1, DRAW_BAT
     j DRAWING_DONE
 
-DRAW_SLIME:
-    lw t0, %lo(SLIME_SPRITE)(gp)              # Load character value to write
-    lw t1, %lo(SLIME_SPAWN_LOC)(gp)           # Load address of character location
+############################
+# Draw Rock
+############################
+DRAW_ROCK:
+    lw t0, %lo(ROCK_SPRITE)(gp)              # Load character value to write
+    lw t1, %lo(ROCK_SPAWN_LOC)(gp)           # Load address of character location
     add a1, a1, t1
     sw t0, 0(a1)
+    addi t1, a1, NEG_ADDRESSES_PER_ROW
+    sw t0, 0(t1)
+    addi t1, t1, NEG_ADDRESSES_PER_ROW
+    sw t0, 0(t1)
+
     li t2, 20
-    beq t4, t2, COLLISION_CHECK_SLIME
+    beq t4, t2, COLLISION_CHECK_ROCK
     li t2, DINOSAUR_COLUMN
-    beq t4, t2, COLLISION_CHECK_SLIME
+    beq t4, t2, COLLISION_CHECK_ROCK
     j DRAWING_DONE
 
+############################
+# Draw Bat
+############################
 DRAW_BAT:
-    lw t0, %lo(BAT_SPRITE)(gp)                # Load character value to write
+    addi t2, gp, %lo(BAT_SPRITE)
+    lw t0, 0(t2)                              # Load character value to write
+    addi t2, t2, 4
+    lw t2, 0(t2)
+    
     lw t1, %lo(BAT_SPAWN_LOC)(gp)             # Load address of character location
     add a1, a1, t1
     sw t0, 0(a1)
+
+    addi t1, a1, NEG_ADDRESSES_PER_ROW
+    sw t2, 0(t1)
+    lw t0, %lo(EMPTY_TILE)(gp)                # Load character value to write
+    addi t1, a1, ADDRESSES_PER_ROW
+    sw t0, 0(t1)
+
     li t2, 20
     beq t4, t2, COLLISION_CHECK_BAT
     li t2, DINOSAUR_COLUMN
     beq t4, t2, COLLISION_CHECK_BAT
     j DRAWING_DONE
-    
+
+############################
+# Draw Blank
+############################
 DRAW_BLANK:
     lw t0, %lo(EMPTY_TILE)(gp)                # Load character value to write
-    lw t1, %lo(SLIME_SPAWN_LOC)(gp)           # Load address of character location
+    lw t1, %lo(ROCK_SPAWN_LOC)(gp)           # Load address of character location
     add a1, a1, t1
     sw t0, 0(a1)    # Put blank over the location.
     addi t1, a1, NEG_ADDRESSES_PER_ROW
@@ -500,14 +528,15 @@ DRAWING_DONE:
     addi t3, t3, 4 # Increment index.
     li t2, LAST_COLUMN
     bne t4, t2, DRAW_OBSTACLE_LOOP
-    #######
-    jalr x0, ra, 0
+#### End of Loop ####
+
+    jalr x0, ra, 0 # Returned return address.
 
 
 ############################
 # Collision check
 ############################
-COLLISION_CHECK_SLIME:
+COLLISION_CHECK_ROCK:
     lw t0, %lo(DINOSAUR_STATUS)(gp)
     li t1, DINOSAUR_JUMP_ST
     beq t0, t1, DRAWING_DONE
@@ -533,29 +562,19 @@ GAMEOVER_WAIT_FOR_NEW_KEY:
 
     j RESTART
 
-
-
-
 ################################################################################
 # Data segment
 ################################################################################
-
 .data
-# This stores the value of the character that represents the destination
-NUMBER_OF_COLUMNS:
-    .word LAST_COLUMN
-
-OBSTACLE_INDEX_POINTER:
-    .word 0
-
+# Current Dinosaur location.
 DINOSAUR_LOC:
     .word STARTING_LOC
 
-# Dinosaur status
+# Current Dinosaur status
 DINOSAUR_STATUS:
     .word DINOSAUR_RUN_ST
 
-# Dinosaur run status (to make animation)
+# Current Dinosaur run status (to make animation)
 DINOSAUR_RUN_STATUS:
     .word RUN_1_ST
 
@@ -588,16 +607,20 @@ BAT_SPAWN_LOC:
     .word BAT_SPAWN
 
 # The location where slimes are spawned.
-SLIME_SPAWN_LOC:
-    .word SLIME_SPAWN
+ROCK_SPAWN_LOC:
+    .word ROCK_SPAWN
 
 # The Character for slime.
-SLIME_SPRITE:
-    .word CHAR_SLIME
+ROCK_SPRITE:
+    .word CHAR_ROCK
 
 # The Character for bat.
 BAT_SPRITE:
-    .word CHAR_BAT
+    .word CHAR_BAT CHAR_BAT2
+
+# The index pointer for the obstacle type array.
+OBSTACLE_INDEX_POINTER:
+    .word 0
 
 # Use this array to hold the obstacle position.
 # This currently holds 10 obstacles.
@@ -605,7 +628,7 @@ OBSTACLE_TYPE_ARRAY:
     .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
     .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
     .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 2 0 0 0 0 0 0
     .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
     .word 0 0 0 0 0 0 0 0 2 0 0 0 0 0 0
     .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
@@ -626,13 +649,17 @@ OBSTACLE_TYPE_ARRAY:
     .word 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0
     .word 0 0 0 0 1 0 0 0 0 0 0 0 0 2 0
     .word 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
-    .word 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0
-    .word 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0
-    .word 0 0 0 0 0 0 2 0 0 0 0 0 0 0 0
-    .word 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0
+    .word 0 0 2 0 0 0 0 1 0 0 0 0 2 0 0
+    .word 0 1 0 0 0 0 0 1 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 2 0 0 0 2 0 0 0 0
+    .word 0 0 0 0 2 0 0 0 0 0 0 0 1 0 0
     .word 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0
+    .word 0 0 0 0 0 1 0 0 2 0 0 0 0 0 0
+    .word 0 0 1 0 0 0 0 2 0 0 0 0 0 1 0
     .word 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
-    .word 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
-    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0
+    .word 0 0 0 0 1 0 0 0 2 0 0 0 0 0 0
+    .word 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0
+    .word 0 2 0 0 0 1 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 2 0 2 0 0 0 0 0 1 0 0 2
 ######################################################################################
