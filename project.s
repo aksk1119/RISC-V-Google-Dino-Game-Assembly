@@ -102,12 +102,13 @@
     .eqv JUMP_GROUND_TICKS  6
 
     # Obstacles
-    .eqv ROCK_VALUE 1
-    .eqv BAT_VALUE 2
-    .eqv ROCK_SPAWN    0xb800 # TODO Fix the address.
-    .eqv BAT_SPAWN      0xb600   # TODO Fix the address.
-    .eqv CHAR_BAT       0x000fff02 # TODO Draw new character.
-    .eqv CHAR_ROCK     0x000fff01 # TODO Draw new character.
+    .eqv ROCK_VALUE    1
+    .eqv BAT_VALUE     2
+    .eqv ROCK_SPAWN    0xb800
+    .eqv BAT_SPAWN     0xb600
+    .eqv CHAR_BAT_U    0x000fff11
+    .eqv CHAR_BAT_D    0x000fff12
+    .eqv CHAR_ROCK     0x000fff01
 
 main:
 	# Setup the stack: sp = 0x3ffc
@@ -572,6 +573,14 @@ GAMEOVER_WAIT_FOR_NEW_KEY:
 DINOSAUR_LOC:
     .word STARTING_LOC
 
+# The location where bats are spawned.
+BAT_SPAWN_LOC:
+    .word BAT_SPAWN
+
+# The location where slimes are spawned.
+ROCK_SPAWN_LOC:
+    .word ROCK_SPAWN
+
 # Current Dinosaur status
 DINOSAUR_STATUS:
     .word DINOSAUR_RUN_ST
@@ -603,22 +612,10 @@ DUCK2_R:
     .word DINOSAUR_DUCK2_R
 EMPTY_TILE:
     .word EMPTY_SPACE
-
-# The location where bats are spawned.
-BAT_SPAWN_LOC:
-    .word BAT_SPAWN
-
-# The location where slimes are spawned.
-ROCK_SPAWN_LOC:
-    .word ROCK_SPAWN
-
-# The Character for slime.
 ROCK_SPRITE:
     .word CHAR_ROCK
-
-# The Character for bat.
 BAT_SPRITE:
-    .word CHAR_BAT CHAR_BAT2
+    .word CHAR_BAT_U CHAR_BAT_D
 
 # The index pointer for the obstacle type array.
 OBSTACLE_INDEX_POINTER:
@@ -627,44 +624,41 @@ OBSTACLE_INDEX_POINTER:
 # Use this array to hold the obstacle position.
 # This currently holds 10 obstacles.
 OBSTACLE_TYPE_ARRAY:
-    .word 0 0 0 0 0 0 0 0 0 0
-    .word 0 0 1 0 0 0 0 0 0 0
-    .word 0 0 0 0 0 1 0 0 0 0
-    .word 0 2 0 0 0 0 0 1 0 0
-    .word 0 0 0 2 0 0 0 1 0 0
-    .word 0 0 0 2 0 2 0 0 0 0
-    .word 0 0 0 1 0 0 0 2 0 0
-    .word 0 2 0 0 0 0 0 0 0 0
-    .word 0 0 1 0 0 0 0 0 0 0
-    .word 0 0 0 1 1 0 0 0 0 0
-    .word 0 0 0 0 0 0 2 0 0 0
-    .word 0 0 0 0 0 1 0 0 0 0
-    .word 0 0 0 0 2 0 0 0 0 0
-    .word 0 0 0 2 0 0 0 1 0 0
-    .word 0 0 0 2 0 2 0 0 0 0
-    .word 0 0 0 1 0 0 0 2 0 0
-    .word 0 2 0 0 0 0 0 0 0 0
-    .word 0 0 1 0 0 0 0 0 0 0
-    .word 0 0 0 1 1 0 0 0 0 0
-    .word 0 0 0 0 0 0 2 0 0 0
-    .word 0 0 0 0 0 1 0 0 0 0
-    .word 0 0 0 0 2 0 0 0 0 0
-    .word 0 0 0 2 0 0 0 1 0 0
-    .word 0 0 0 2 0 2 0 0 0 0
-    .word 0 0 0 1 0 0 0 2 0 0
-    .word 0 2 0 0 0 0 0 0 0 0
-    .word 0 0 1 0 0 0 0 0 0 0
-    .word 0 0 0 1 1 0 0 0 0 0
-    .word 0 0 0 0 0 0 2 0 0 0
-    .word 0 0 0 0 0 1 0 0 0 0
-    .word 0 0 0 0 2 0 0 0 0 0
-    .word 0 0 0 2 0 0 0 1 0 0
-    .word 0 0 0 2 0 2 0 0 0 0
-    .word 0 0 0 1 0 0 0 2 0 0
-    .word 0 2 0 0 0 0 0 0 0 0
-    .word 0 0 1 0 0 0 0 0 0 0
-    .word 0 0 0 1 1 0 0 0 0 0
-    .word 0 0 0 0 0 0 2 0 0 0
-    .word 0 0 0 0 0 1 0 0 0 0
-    .word 0 0 0 0 2 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 2 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 2 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 2 0 0 0 0
+    .word 0 0 0 0 2 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 2 0 0 0 0 0 0 0 1 0 0
+    .word 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0
+    .word 0 0 0 2 0 0 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0
+    .word 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 0 0 2 0 0 0 0 0
+    .word 0 0 0 0 1 0 0 0 0 0 0 0 0 2 0
+    .word 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
+    .word 0 0 2 0 0 0 0 1 0 0 0 0 2 0 0
+    .word 0 1 0 0 0 0 0 1 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 2 0 0 0 2 0 0 0 0
+    .word 0 0 0 0 2 0 0 0 0 0 0 0 1 0 0
+    .word 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0
+    .word 0 0 0 0 0 1 0 0 2 0 0 0 0 0 0
+    .word 0 0 1 0 0 0 0 2 0 0 0 0 0 1 0
+    .word 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0
+    .word 0 0 0 0 1 0 0 0 2 0 0 0 0 0 0
+    .word 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0
+    .word 0 2 0 0 0 1 0 0 0 0 0 0 0 0 0
+    .word 0 0 0 2 0 2 0 0 0 0 0 1 0 0 2
 ######################################################################################
