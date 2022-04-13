@@ -67,6 +67,7 @@
     .eqv NEG_ADDRESSES_PER_ROW -512
     
     .eqv SEGMENT_TIMER_INTERVAL 100
+    .eqv END_OF_ARRAY 1800
 
     # Graphic basics
     .eqv CHAR_SPACE 0x20 
@@ -113,11 +114,11 @@
     .eqv CHAR_ROCK     0x000fff01
 
     # SCORE
-    .eqv FIRST_LOC         0x8328
-    .eqv SECOND_LOC         0x8324
-    .eqv THIRD_LOC     0x8320
-    .eqv FOURTH_LOC    0x831c
-    .eqv SCORE_CHAR_BASE        0x000fff30
+    .eqv FIRST_LOC          0x00008328
+    .eqv SECOND_LOC         0x00008324
+    .eqv THIRD_LOC          0x00008320
+    .eqv FOURTH_LOC         0x0000831c
+    .eqv SCORE_CHAR_BASE    0x000fff30
 
 main:
 	# Setup the stack: sp = 0x3ffc
@@ -455,12 +456,6 @@ DRAW_DUCK2:
     addi t1, t1, 4
     sw t0, 0(t1)
 
-    ### REMOVE THIS!
-    lw t0, %lo(ROCK_SPRITE)(gp)
-    lw t1, %lo(FIRST_VAL)(gp)
-    sw t0, 0(t1)
-    ####################
-
 DINOSAUR_CONTROL_DONE:
     jalr x0, ra, 0
 
@@ -479,6 +474,11 @@ DRAW_OBSTACLE:
     addi t4, x0, 0 # t4 is a counter register.
     # t3 -> permanent index pointer.
     lw t3, %lo(OBSTACLE_INDEX_POINTER)(gp)  # Get Pointer "VALUE"
+    li t0, END_OF_ARRAY
+    blt t3, t0, NOT_END_OF_ARRAY
+    addi s3, x0, 1 # Set GAMEOVER Flag to be 1
+
+NOT_END_OF_ARRAY:
     addi t1, gp, %lo(OBSTACLE_INDEX_POINTER) # Get Pointer's address
     # t0 -> incremented permanent index.
     addi t0, t3, 4
@@ -492,7 +492,7 @@ DRAW_OBSTACLE_LOOP:
     slli a1, t4, 2 # Multiply the counter by 4 to make column address value.
     # Get the data from obstacle type array,
     # and check which type the obstacle is.
-    lw t0, %lo(OBSTACLE_TYPE_ARRAY)(t3) 
+    lw t0, %lo(OBSTACLE_TYPE_ARRAY)(t3)
     beq t0, x0, DRAW_BLANK
     li t1, ROCK_VALUE
     beq t0, t1, DRAW_ROCK
@@ -572,9 +572,13 @@ DRAWING_DONE:
     li t2, LAST_COLUMN
     bne t4, t2, DRAW_OBSTACLE_LOOP
 #### End of Loop ####
+CHECK_GAMEOVER:
+    li, t0, 1
+    beq s3, t0, GAME_WIN
+    li, t0, 2
+    beq s3, t0, GAMEOVER
 
     jalr x0, ra, 0 # Returned return address.
-
 
 ############################
 # Collision Check
@@ -582,14 +586,18 @@ DRAWING_DONE:
 COLLISION_CHECK_ROCK:
     lw t0, %lo(DINOSAUR_STATUS)(gp)
     li t1, DINOSAUR_JUMP_ST
-    bne t0, t1, GAMEOVER
-    
-    beq x0, x0, CALCULATE_NEW_SCORE
+    # If dinosaur did not collide, finish this process.
+    beq t0, t1, CALCULATE_NEW_SCORE
+    addi s3, x0, 2 # Set GAMEOVER Flag to be 1
+    j DRAWING_DONE
     
 COLLISION_CHECK_BAT:
     lw t0, %lo(DINOSAUR_STATUS)(gp)
     li t1, DINOSAUR_DUCK_ST
-    bne t0, t1, GAMEOVER
+    # If dinosaur did not collide, finish this process.
+    beq t0, t1, CALCULATE_NEW_SCORE
+    addi s3, x0, 2 # Set GAMEOVER Flag to be 1
+    j DRAWING_DONE
 
 ############################
 # Calculate New Score
@@ -607,7 +615,7 @@ CALCULATE_NEW_SCORE:
 
     addi t2, gp, %lo(SCORE)
     sw t1, 0(t2)
-
+    
     j UPDATE_SCORE_ON_DISPLAY
 
 INCREASE_TENS:
@@ -666,42 +674,51 @@ SCORE_OVER_THE_LIMIT:
     j GAMEOVER
 
 UPDATE_SCORE_ON_DISPLAY:
+    # Update ones value
     addi t2, gp, %lo(SCORE)
-    lw t0, 0(t2)
-    lw t1, %lo(FIRST_VAL)(gp)
     li t3, SCORE_CHAR_BASE
+    lw t0, 0(t2)
+    #lw t1, %lo(FIRST_VAL)(gp)
+    li t1, FIRST_LOC
     add t0, t0, t3
     sw t0, 0(t1)
 
+    # Update tens value
     addi t2, t2, 4
     lw t0, 0(t2)
-    lw t1, %lo(SECOND_VAL)(gp)
-    li t3, SCORE_CHAR_BASE
+    li t1, SECOND_LOC
     add t0, t0, t3
     sw t0, 0(t1)
 
+    # Update hundreds value
     addi t2, t2, 4
     lw t0, 0(t2)
-    lw t1, %lo(THIRD_VAL)(gp)
-    li t3, SCORE_CHAR_BASE
+    li t1, THIRD_LOC
     add t0, t0, t3
     sw t0, 0(t1)
 
+    # Update thousands value
     addi t2, t2, 4
     lw t0, 0(t2)
-    lw t1, %lo(FOURTH_VAL)(gp)
-    li t3, SCORE_CHAR_BASE
+    li t1, FOURTH_LOC
     add t0, t0, t3
     sw t0, 0(t1)
+
     
 DONE_CALCULATING_SCORE:
     lw t3, 0(sp)		# Restore return address
 	addi sp, sp, 4		# Update stack pointer
-    beq x0, x0, DRAWING_DONE
+    j DRAWING_DONE
+
 ############################
 # Game Over
 ############################
+GAME_WIN:
+    li t0, 0xffff
+    sw t0, LED_OFFSET(tp)
+
 GAMEOVER:
+    li s3, 0            # Reset the gameover flag
     lw ra, 0(sp)		# Restore return address
 	addi sp, sp, 4		# Update stack pointer
 
@@ -722,6 +739,146 @@ GAMEOVER_WAIT_FOR_NEW_KEY:
 
     j RESTART
 
+
+
+###################################################################
+# Stores code state and stops execution
+# Displays register values on 7-seg dispaly
+# BTNL: Show upper half word
+# SW15: Show data segment
+#   lower switches give word offset
+# BTNR: Continue
+# Switches determine what shows
+#   a0-a7:  0x0-0x7
+#   s0-s11: 0x8-0x13
+#   tp:     0x14
+#   gp:     0x15
+#   sp:     0x16
+#   7-Seg:  0x17
+#   t0-t6:  0x18-0x1e
+#   ra:     0x1f
+#   stack:  0x20+
+# NOTE: 
+# ra is the only register modified by calling this procedure
+# make sure your procedure protects ra before calling BREAK_POINT
+#
+# NOTE:
+# This uses several constants and the global registers from 
+# provided code in previous lab (gp & tp). Either make sure 
+# they are included in your code, or change them here as needed.
+###################################################################
+
+BREAK_POINT:
+    #protect state
+    addi sp, sp, -128
+    sw a0, 0(sp)
+    sw a1, 4(sp)
+    sw a2, 8(sp)
+    sw a3, 12(sp)
+    sw a4, 16(sp)
+    sw a5, 20(sp)
+    sw a6, 24(sp)
+    sw a7, 28(sp)
+    sw s0, 32(sp)
+    sw s1, 36(sp)
+    sw s2, 40(sp)
+    sw s3, 44(sp)
+    sw s4, 48(sp)
+    sw s5, 52(sp)
+    sw s6, 56(sp)
+    sw s7, 60(sp)
+    sw s8, 64(sp)
+    sw s9, 68(sp)
+    sw s10, 72(sp)
+    sw s11, 76(sp)
+    sw tp, 80(sp)
+    sw gp, 84(sp)
+    sw sp, 88(sp)
+    sw t0, 96(sp)
+    sw t1, 100(sp)
+    sw t2, 104(sp)
+    sw t3, 108(sp)
+    sw t4, 112(sp)
+    sw t5, 116(sp)
+    sw t6, 120(sp)
+    sw ra, 124(sp)
+    lw a0, SEVENSEG_OFFSET(tp)
+    sw a0, 92(sp)
+
+BP_LOOP:
+    #get input
+    lw s1, BUTTON_OFFSET(tp)    #buttons save in s1
+    lw s2, SWITCH_OFFSET(tp)    #switches in s2
+    slli s3, s2, 2              #mutliply switches by word size
+    #get where to look for data
+    #top of stack has registers
+    add s4, x0, sp          #default to values from stack
+    srli t0, s2, 15         #get just highest switch
+    beq t0, x0, BP_STACK_VALUES
+    add s4, x0, gp          #instead use values from data segment
+
+BP_STACK_VALUES:
+    #get address
+    add s5, s3, s4          #add offset to starting point
+    #get value
+    lw s6, 0(s5)
+    #find which halfword to show
+    andi t0, s1, BUTTON_L_MASK
+    beq t0, x0, BP_LOWER_HALF
+    srli s6, s6, 16         #BTNL pressed, shift value over
+
+BP_LOWER_HALF:
+    #get value
+    #display
+    sw s6, SEVENSEG_OFFSET(tp)
+    #loop
+    andi t0, s1, BUTTON_R_MASK
+    beq t0, x0, BP_LOOP
+
+BP_END:
+    #restore state
+    sw a0, SEVENSEG_OFFSET(tp)
+    lw a0, 0(sp)
+    lw a1, 4(sp)
+    lw a2, 8(sp)
+    lw a3, 12(sp)
+    lw a4, 16(sp)
+    lw a5, 20(sp)
+    lw a6, 24(sp)
+    lw a7, 28(sp)
+    lw s0, 32(sp)
+    lw s1, 36(sp)
+    lw s2, 40(sp)
+    lw s3, 44(sp)
+    lw s4, 48(sp)
+    lw s5, 52(sp)
+    lw s6, 56(sp)
+    lw s7, 60(sp)
+    lw s8, 64(sp)
+    lw s9, 68(sp)
+    lw s10, 72(sp)
+    lw s11, 76(sp)
+    lw tp, 80(sp)
+    lw gp, 84(sp)
+    lw sp, 88(sp)
+    lw t0, 96(sp)
+    lw t1, 100(sp)
+    lw t2, 104(sp)
+    lw t3, 108(sp)
+    lw t4, 112(sp)
+    lw t5, 116(sp)
+    lw t6, 120(sp)
+    lw ra, 124(sp)
+    addi sp, sp, 128
+
+    
+
+    #return
+
+    jalr x0, ra, 0
+
+
+
 ################################################################################
 # DATA SEGMENT
 #
@@ -732,17 +889,10 @@ GAMEOVER_WAIT_FOR_NEW_KEY:
 SCORE:
     .word 0 0 0 0
 
-FIRST_VAL:
-    .word FIRST_LOC
-
-SECOND_VAL:
-    .word SECOND_LOC
-
-THIRD_VAL:
-    .word THIRD_LOC
-
-FOURTH_VAL:
-    .word FOURTH_LOC
+# This is added to avoid some weird error that I could not
+# make it to work.
+EMPTY_PLACE_HOLDER:
+    .word 0 0 0 0
 
 # The location where bats are spawned.
 BAT_SPAWN_LOC:
@@ -759,6 +909,9 @@ DINOSAUR_STATUS:
 # Current Dinosaur run status (to make animation)
 DINOSAUR_RUN_STATUS:
     .word RUN_1_ST
+
+SCORE_CHAR_BASE_VALUE:
+    .word SCORE_CHAR_BASE
 
 
 
@@ -845,4 +998,24 @@ OBSTACLE_TYPE_ARRAY:
     .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 38
     .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 39
     .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 40
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 41
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 42
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 43
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 44
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 45
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 46
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 47
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 48
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 49
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 50
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 51
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 52
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 53
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 54
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 55
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 56
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 57
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 58
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 59
+    .word 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 # 60
 ################################################################################
