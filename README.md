@@ -16,4 +16,20 @@ vivado -mode batch -source ../resources/load_mem.tcl -tclargs updateFont final.d
 <h3>Add background memory to .dcp file</h3>
 vivado -mode batch -source ../resources/load_mem.tcl -tclargs updateBackground final.dcp project_background.txt final.bit final.dcp
 
+<h1>Instructions</h1>
+The project we have created is a game from Google - it is the dinosaur
+game that you play when you do not have connection to the internet. 
+The object of the game is to avoid the obstacles (bats and rocks) that come
+at you and get as far as you can. Whenever you get past an obstacle, your 
+score is incremented by 2.
 
+The controls for this game are simple. BTNU is a jump - your dinosaur will
+jump over obstacles into the air and come back down. BTND is a duck - your 
+dinosaur will duck under obstacles. BTNC is a reset - when you die, the game
+will stop until you press BTNC. Once you do, the game will start over from
+the beginning.
+
+Bats will kill you when they reach you unless you duck under them. If you 
+are running or jumping, the bat will kill you. Rocks will kill you when they 
+reach you unless you are jumping over them. If you are running or ducking, 
+the rock will kill you.
