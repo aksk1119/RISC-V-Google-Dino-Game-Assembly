@@ -1,10 +1,10 @@
 <h1>Vivado Commands</h1>
 
 <h3>Generate .mem files</h3>
-java -jar ../resources/rars1_4.jar mc CompactTextAtZero a \
-  dump .text HexText final_iosystem_text.mem \
-  dump .data HexText final_iosystem_data.mem \
-  dump .text SegmentWindow final_iosystem_s.txt \
+java -jar ../resources/rars1_4.jar mc CompactTextAtZero a \ <br>
+  dump .text HexText final_iosystem_text.mem \ <br>
+  dump .data HexText final_iosystem_data.mem \ <br>
+  dump .text SegmentWindow final_iosystem_s.txt \ <br>
   final_iosystem.s
 
 <h3>Apply the .mem files to .dcp file</h3>
