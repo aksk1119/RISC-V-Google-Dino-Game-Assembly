@@ -1,7 +1,7 @@
 <h1>About</h1>
 This project is implementing RISC-V functions using SystemVerilog.<br>
 For this project, Digilent's BASYS 3 has been used as a board. <br>
-(For more information about BASYS 3, click <a href="https://digilent.com/shop/basys-3-artix-7-fpga-trainer-board-recommended-for-introductory-users/">Here</a>.<br>
+(For more information about BASYS 3, click <a href="https://digilent.com/shop/basys-3-artix-7-fpga-trainer-board-recommended-for-introductory-users/">Here</a>.)<br>
 
 
 <h1>Vivado Commands</h1>
