@@ -22,7 +22,7 @@ vivado -mode batch -source ../resources/load_mem.tcl -tclargs updateFont final.d
 <h3>Add background memory to .dcp file</h3>
 vivado -mode batch -source ../resources/load_mem.tcl -tclargs updateBackground final.dcp project_background.txt final.bit final.dcp
 
-<h1>Instructions</h1>
+<h1>Instructions For the Game</h1>
 The project we have created is a game from Google - it is the dinosaur
 game that you play when you do not have connection to the internet. 
 The object of the game is to avoid the obstacles (bats and rocks) that come
